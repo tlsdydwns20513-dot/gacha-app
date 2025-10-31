@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>문방구 캡슐 뽑기</title>
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
+    <style>
+        /* 기본 설정 */
+        body {
+            font-family: 'Gowun Dodum', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #a2d2ff, #fff176); /* [수정] 장난감 나라 테마 */
+            margin: 0;
+            overflow: hidden; /* 불필요한 스크롤 방지 */
+            color: #333;
+        }
+
+        /* --- [NEW] 전체 앱을 감싸는 래퍼 --- */
+        #app-wrapper {
+            position: relative;
+            /* 데스크톱 레이아웃 기준 크기 (가장 넓은 요소 기준) */
+            /* 기계(350) + 동전(100) + 좌우여백(70+50) + 레버(70) = 640px */
+            /* 좌측 카운터(200) + 여백(20) + 기계(350) + 레버(70) = 640px */
+            width: 700px; 
+            height: 600px; /* 기계(550) + 상하 여백 */
+            /* transform-origin: center center; */ /* 크기 조절 기준점 */
+            /* transition: transform 0.3s ease-out; */ /* 부드러운 전환 (선택 사항) */
+        }
+
+
+        /* --- [NEW] 남은 상품 갯수 표시 --- */
+        #prize-counter {
+            position: absolute; /* [수정] 래퍼 기준 절대 위치 */
+            top: 20px;
+            left: 20px;
+            padding: 15px;
+            background-color: rgba(255, 250, 240, 0.9); /* [수정] 테마에 맞는 크림색 */
+            border-radius: 10px;
+            border: 3px solid #e63946; /* [수정] 테마에 맞는 빨간색 */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            font-size: 1rem;
+            font-weight: bold;
+            color: #1d3557;
+            line-height: 1.6;
+            z-index: 20; /* 모달보다는 낮고 머신보다는 높게 */
+        }
+        #prize-counter b {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            display: block;
+            color: #e63946;
+        }
+
+
+        /* 전체 가챠 머신 컨테이너 */
+        #gacha-container {
+            position: absolute; /* [수정] 래퍼 기준 절대 위치 */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* 래퍼 중앙에 배치 */
+            width: 350px; /* 머신 전체 너비 */
+            height: 550px; /* 머신 전체 높이 */
+            background-color: #fffaf0; /* [수정] 부드러운 크림색 */
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            border: 5px solid #e63946; /* [수정] 테마에 맞는 빨간색 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            z-index: 10; /* 동전보다 위에 있도록 */
+        }
+
+        /* 머신 상단 로고/제목 */
+        #gacha-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #e63946;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        /* 캡슐들이 보이는 투명 창 */
+        #gacha-window {
+            width: 80%;
+            height: 180px;
+            background-color: rgba(255, 255, 255, 0.7); /* 투명 유리 효과 */
+            border: 2px solid #a8dadc;
+            border-radius: 10px;
+            margin-bottom: 15px; /* 여백 조정 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem;
+            color: #666;
+            overflow: hidden; /* 캡슐이 밖으로 나가지 않도록 */
+            position: relative;
+        }
+        #gacha-window::before { /* 안에 캡슐들이 있는 척 */
+            content: '';
+            position: absolute;
+            width: 90%;
+            height: 90%;
+            background: 
+                radial-gradient(circle at 20% 20%, #ff6b6b 8px, transparent 8px),
+                radial-gradient(circle at 70% 30%, #4ecdc4 8px, transparent 8px),
+                radial-gradient(circle at 40% 80%, #ffe66d 8px, transparent 8px),
+                radial-gradient(circle at 80% 60%, #a2d2ff 8px, transparent 8px);
+            background-size: 40px 40px; /* 캡슐 크기 */
+            opacity: 0.7;
+        }
+
+        /* --- 기계 브랜드 이름 --- */
+        #brand-name {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #1d3557;
+            text-shadow: 1px 1px 1px rgba(255,255,255,0.7);
+            margin-bottom: 15px; /* 코인 슬롯 전 여백 */
+        }
+
+        /* 동전 투입구 */
+        #coin-slot {
+            width: 60px;
+            height: 30px;
+            background-color: #a9a9a9;
+            border-radius: 5px;
+            position: relative;
+            margin-bottom: 25px;
+            border: 2px solid #777;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+        }
+        #coin-slot::before { /* 구멍 */
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 8px;
+            background-color: #333;
+            border-radius: 4px;
+        }
+
+        /* 동전 (클릭 가능) */
+        #coin {
+            width: 100px; /* 절반으로 줄임 */
+            height: 100px; /* 절반으로 줄임 */
+            background-color: #feca57; /* 금색 */
+            border-radius: 50%;
+            position: absolute; /* [수정] 래퍼 기준 절대 위치 */
+            top: 50%; /* 래퍼 세로 중앙 */
+            /* left: calc(50% - 175px - 100px - 50px); */ /* 50% - (기계절반) - (동전너비) - (여백) */
+            left: 20px; /* [수정] 카운터와 비슷한 위치 (기계 기준 50% - 175px - 150px) */
+            transform: translateY(-50%); /* 세로 중앙 정렬 */
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            transition: top 0.5s ease-in, left 0.5s ease-in, opacity 0.5s ease-out, transform 0.5s ease-in; /* 애니메이션 효과 */
+            border: 5px solid #d4a72d;
+            font-size: 1.5rem; /* 글자 크기 조정 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #6a4a00;
+            z-index: 5; /* 가챠 머신보다 아래에 있도록 */
+        }
+        #coin.inserted { /* 동전이 투입구로 들어가는 애니메이션 */
+            /* brand-name 추가로 코인슬롯이 60px 내려감 */
+            /* [수정] 래퍼 중앙(50%) + 기계 padding(20) + title(35) + window(195) + brand(40) = 290px */
+            /* 래퍼 중앙(300px) - (기계 절반 275px) + (슬롯까지의 거리 290px) = 315px */
+            top: 315px; /* 코인 슬롯의 절대 Y 위치 */
+            left: 50%; /* 래퍼 중앙(기계 중앙) */
+            transform: translate(-50%, -50%) scale(0.1); /* [수정] 작아지면서 들어가는 효과 */
+            opacity: 0;
+            pointer-events: none; /* 클릭 방지 */
+        }
+        
+        /* 레버 */
+        #lever-arm {
+            position: absolute;
+            /* [수정] 기계 중앙(50%) + 기계 절반(175px) - 밖으로 나갈 offset(70px) = 50% + 105px */
+            right: calc(50% - 175px - 70px); /* [수정] 래퍼 기준 절대 위치 */
+            top: 300px; /* [수정] 래퍼 기준 절대 위치 (250 + 50) */
+            width: 30px; /* 조금 더 두껍게 */
+            height: 120px; /* 조금 더 길게 */
+            background-color: #00a8e8; /* [수정] 장난감 같은 파란색 */
+            border-radius: 15px;
+            /* transform-origin: top center; */ /* 회전 기준점 제거 */
+            transition: transform 0.2s ease-out;
+            cursor: pointer;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+            border: 2px solid #0077b6; /* [수정] 파란색 테두리 */
+        }
+        #lever-arm::after { /* 레버 손잡이 (움직이는 부분) */
+            content: '';
+            position: absolute;
+            bottom: -20px; /* 위치 조정 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px; /* 크기 증가 */
+            height: 50px; /* 크기 증가 */
+            background-color: #e63946; /* 빨간색 손잡이 */
+            border-radius: 50%;
+            border: 3px solid #b32d39;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+            transition: transform 0.2s ease-out; /* 손잡이만 움직이는 애니메이션 */
+        }
+        #lever-arm.pulled::after { /* 레버가 당겨진 상태 */
+            transform: translateX(-50%) translateY(40px); /* 손잡이만 아래로 이동 */
+        }
+        #lever-arm.disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        /* 캡슐 배출구 */
+        #capsule-output {
+            width: 150px;
+            height: 60px;
+            background-color: #ced4da; /* 밝은 회색 */
+            border-radius: 10px;
+            position: relative;
+            margin-top: 30px; /* 레버 아래 공간 */
+            border: 2px solid #adb5bd;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* 캡슐이 밖으로 튀어나오지 않도록 */
+        }
+        #capsule-output::before { /* 배출구 아래 그림자 */
+            content: '';
+            position: absolute;
+            width: 80%;
+            height: 10px;
+            background-color: rgba(0,0,0,0.1);
+            bottom: -10px;
+            border-radius: 0 0 10px 10px;
+        }
+
+        /* 캡슐 (나오는 캡슐) */
+        #result-capsule {
+            width: 60px;
+            height: 60px;
+            background-color: #f4d03f; /* 기본 캡슐 색상 */
+            border-radius: 50%;
+            position: absolute;
+            top: -80px; /* 초기 위치 (숨겨져 있음) */
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #333;
+            text-align: center;
+            padding: 5px;
+            box-sizing: border-box;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+            transition: top 0.5s ease-out, transform 0.5s ease-out, background-color 0.3s;
+        }
+        /* 캡슐 굴러나오는 애니메이션 */
+        @keyframes capsuleRollOut {
+            0% {
+                top: -80px;
+                transform: translateX(-50%) rotate(0deg);
+                opacity: 0;
+            }
+            30% { /* 머신 내부에서 잠시 대기 */
+                top: 20px; /* 대략 캡슐 배출구 높이 */
+                transform: translateX(-50%) rotate(360deg);
+                opacity: 1;
+            }
+            100% {
+                top: 0; /* 배출구 바닥 */
+                transform: translateX(-50%) rotate(720deg);
+                opacity: 1;
+            }
+        }
+        .rolling-out {
+            animation: capsuleRollOut 1.5s ease-out forwards; /* forwards로 최종 상태 유지 */
+        }
+
+        /* 캡슐 개봉 애니메이션 */
+        @keyframes prizePulse {
+            0% {
+                transform: translateX(-50%) scale(1);
+            }
+            50% {
+                transform: translateX(-50%) scale(1.15);
+            }
+            100% {
+                transform: translateX(-50%) scale(1);
+            }
+        }
+        .prize-reveal-animation {
+            animation: prizePulse 0.4s ease-in-out;
+        }
+
+        /* --- [NEW] 캡슐 흔들림 효과 --- */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        #gacha-window.shaking::before {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) infinite;
+        }
+
+
+        /* 메시지 표시 영역 */
+        #message {
+            margin-top: 25px;
+            font-size: 1rem;
+            color: #1d3557;
+            height: 20px; /* 공간 확보 */
+        }
+        #message.error {
+            color: #e63946;
+            font-weight: bold;
+        }
+
+        /* --- 당첨 결과 모달 --- */
+        #prize-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75); /* 어두운 배경 */
+            display: none; /* 초기 숨김 */
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s ease-out;
+        }
+        #prize-modal.show {
+            display: flex;
+            opacity: 1;
+        }
+        .prize-text {
+            font-size: 7rem; /* 글자 크기 대폭 증가 */
+            font-weight: bold;
+            text-align: center;
+            opacity: 0;
+            transform: scale(0.5);
+            animation: prizeZoomIn 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+
+        /* 등수별 텍스트 스타일 */
+        .prize-text.rank-1 {
+            color: #ffd700;
+            text-shadow: 0 0 10px #fff, 0 0 20px #ffd700, 0 0 40px #ff8c00;
+        }
+        .prize-text.rank-2 {
+            color: #c0c0c0;
+            text-shadow: 0 0 10px #fff, 0 0 20px #c0c0c0, 0 0 30px #a9a9a9;
+        }
+        .prize-text.rank-3 {
+            color: #cd7f32;
+            text-shadow: 0 0 10px #fff, 0 0 20px #cd7f32, 0 0 30px #8b4513;
+        }
+        .prize-text.rank-other {
+            color: #f1faee;
+            text-shadow: 0 0 10px #fff, 0 0 15px #f1faee;
+        }
+
+        /* 당첨 텍스트 확대 애니메이션 */
+        @keyframes prizeZoomIn {
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* --- [NEW] 반응형 미디어 쿼리 --- */
+        @media (max-width: 720px) { /* 래퍼 너비(700px)보다 약간 클 때 */
+            #app-wrapper {
+                /* 화면 너비에 맞게 래퍼를 축소 */
+                transform: scale( calc(100vw / 700) );
+            }
+            body {
+                overflow: hidden; /* 모바일에서 스크롤바 완전 숨김 */
+            }
+        }
+
+        @media (max-width: 620px) { /* 래퍼 높이(600px)가 문제될 때 */
+            #app-wrapper {
+                /* 가로/세로 비율 중 더 작은 쪽에 맞춰서 스케일링 */
+                transform: scale( calc( min( 100vw / 700, 100vh / 600 ) ) );
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- --- [NEW] 전체 앱을 감싸는 래퍼 --- -->
+    <div id="app-wrapper">
+
+        <!-- --- 남은 갯수 표시 UI --- -->
+        <div id="prize-counter">
+            <b>남은 갯수</b>
+            1등: 1명<br>
+            2등: 4명<br>
+            3등: 6명<br>
+            4등: 9명<br>
+            5등: 10명
+        </div>
+
+        <div id="gacha-container">
+            <div id="gacha-title">✨행운의 뽑기✨</div>
+            <div id="gacha-window">
+                <!-- 캡슐들이 보이는 척 하는 배경 --></div>
+
+            <!-- --- 브랜드 이름 추가 --- -->
+            <div id="brand-name">BISAN</div>
+
+            <div id="coin-slot"></div>
+            
+            <div id="lever-arm"></div>
+            
+            <div id="capsule-output">
+                <div id="result-capsule"></div>
+            </div>
+
+            <div id="message">동전을 넣어주세요.</div>
+        </div>
+
+        <!-- 동전은 가챠 머신 컨테이너 바깥에 배치 --><div id="coin">BISAN</div>
+
+    </div> <!-- [NEW] app-wrapper 닫기 -->
+
+
+    <!-- --- 당첨 결과 모달 HTML (래퍼 바깥에 위치) --- -->
+    <div id="prize-modal">
+        <div id="prize-text" class="prize-text"></div>
+    </div>
+
+    <!-- [수정] 사운드 이펙트 요소들 URL 변경 --><audio id="coinSound" src="https://actions.google.com/sounds/v1/coins/coin_drop.ogg" preload="auto"></audio>
+    <audio id="leverSound" src="https://actions.google.com/sounds/v1/switches/switch_turn.ogg" preload="auto"></audio>
+    <audio id="capsuleSound" src="https://actions.google.com/sounds/v1/bubbles/short_bubble_pop.ogg" preload="auto"></audio>
+    <audio id="prizeRevealSound" src="https://actions.google.com/sounds/v1/bells/magic_chime.ogg" preload="auto"></audio>
+
+    <script>
+        // HTML 요소 가져오기
+        const coinElement = document.getElementById("coin");
+        const leverArmElement = document.getElementById("lever-arm");
+        const resultCapsuleElement = document.getElementById("result-capsule");
+        const messageElement = document.getElementById("message");
+        
+        // [수정] 누락되었던 변수 정의 추가
+        const prizeModalElement = document.getElementById("prize-modal");
+        const prizeTextElement = document.getElementById("prize-text");
+        
+        const prizeCounterElement = document.getElementById("prize-counter"); // [NEW]
+        const gachaWindowElement = document.getElementById("gacha-window"); // [NEW]
+
+        // 사운드 요소 가져오기
+        const coinSound = document.getElementById("coinSound");
+        const leverSound = document.getElementById("leverSound");
+        const capsuleSound = document.getElementById("capsuleSound");
+        const prizeRevealSound = document.getElementById("prizeRevealSound");
+
+        let isCoinInserted = false; // 동전 투입 여부
+        let isGachaProcessing = false; // 뽑기 진행 중 여부
+
+        // --- [NEW] 상품 관리 로직 ---
+        let prizeBag = [];
+        let prizeCounts = { 1: 1, 2: 4, 3: 6, 4: 9, 5: 10 };
+        const prizeInfo = {
+            1: { text: "1등!", color: "#ffd700" },
+            2: { text: "2등!", color: "#c0c0c0" },
+            3: { text: "3등!", color: "#cd7f32" },
+            4: { text: "4등", color: "#f4d03f" },
+            5: { text: "5등", color: "#f4d03f" }
+        };
+
+        // Fisher-Yates (aka Knuth) Shuffle
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // 30개의 상품이 든 '주머니'를 만들고 섞습니다.
+        function createPrizeBag() {
+            prizeBag = []; // 주머니 초기화
+            prizeCounts = { 1: 1, 2: 4, 3: 6, 4: 9, 5: 10 }; // 수량 초기화
+            
+            for (const rank in prizeCounts) {
+                for (let i = 0; i < prizeCounts[rank]; i++) {
+                    prizeBag.push({
+                        rank: parseInt(rank), // 등수 (숫자)
+                        text: prizeInfo[rank].text,
+                        color: prizeInfo[rank].color
+                    });
+                }
+            }
+            shuffle(prizeBag); // 주머니를 섞습니다.
+        }
+
+        // 남은 갯수 UI를 업데이트합니다.
+        function updatePrizeCounterUI() {
+            if (prizeCounterElement) {
+                prizeCounterElement.innerHTML = `
+                    <b>남은 갯수</b>
+                    1등: ${prizeCounts[1]}명<br>
+                    2등: ${prizeCounts[2]}명<br>
+                    3등: ${prizeCounts[3]}명<br>
+                    4등: ${prizeCounts[4]}명<br>
+                    5등: ${prizeCounts[5]}명
+                `;
+            }
+        }
+
+        // [MODIFIED] 확률 기반이 아닌, 주머니에서 하나를 꺼내는 함수
+        function drawPrize() {
+            if (prizeBag.length === 0) {
+                return null; // 모든 상품 소진
+            }
+            
+            const prize = prizeBag.pop(); // 섞인 주머니에서 마지막 아이템을 꺼냅니다.
+            prizeCounts[prize.rank]--; // 해당 등수의 카운트를 1 줄입니다.
+            updatePrizeCounterUI(); // UI를 업데이트합니다.
+            return prize;
+        }
+        
+        // [DELETED] 기존 getPrize() 함수는 삭제되었습니다.
+        // --- [NEW] 상품 관리 로직 끝 ---
+
+
+        // --- 이벤트 리스너 ---
+
+        // 동전 클릭 이벤트
+        coinElement.addEventListener("click", () => {
+            if (isGachaProcessing) return; // 뽑기 진행 중에는 클릭 불가
+            if (isCoinInserted) {
+                messageElement.textContent = "이미 동전이 들어있어요!";
+                messageElement.classList.add("error");
+                return;
+            }
+
+            isCoinInserted = true;
+            messageElement.classList.remove("error");
+            messageElement.textContent = "레버를 당겨주세요!"; // 메시지 변경
+            coinElement.classList.add("inserted"); // 동전 애니메이션 시작
+            coinSound.play(); // 동전 소리 재생
+
+            // 동전이 사라진 후 레버 활성화 및 메시지 변경
+            setTimeout(() => {
+                leverArmElement.classList.remove("disabled"); // 레버 활성화
+            }, 500); // 동전 애니메이션 시간에 맞춤
+        });
+
+        // 레버 클릭 이벤트
+        leverArmElement.addEventListener("click", () => {
+            if (isGachaProcessing) return; // 뽑기 진행 중에는 클릭 불가
+            if (!isCoinInserted) {
+                messageElement.textContent = "동전을 먼저 넣어주세요!";
+                messageElement.classList.add("error");
+                return;
+            }
+
+            // --- [NEW] 상품 소진 여부 확인 ---
+            if (prizeBag.length === 0) {
+                messageElement.textContent = "상품이 모두 소진되었습니다!";
+                messageElement.classList.add("error");
+                // 동전 반환 (초기화)
+                isCoinInserted = false;
+                coinElement.classList.remove("inserted");
+                leverArmElement.classList.add("disabled"); // 레버 비활성화 유지
+                return;
+            }
+            // --- [NEW] 끝 ---
+
+            isGachaProcessing = true;
+            messageElement.classList.remove("error");
+            messageElement.textContent = "캡슐이 나오는 중...";
+            
+            leverArmElement.classList.add("pulled"); // 레버 애니메이션 시작
+            leverArmElement.classList.add("disabled"); // 레버 다시 비활성화 (뽑기 진행 중)
+            leverSound.play(); // 레버 소리 재생
+            
+            // --- [NEW] 캡슐 흔들림 효과 시작 ---
+            if (gachaWindowElement) {
+                gachaWindowElement.classList.add("shaking");
+            }
+
+            // 1. 레버가 돌아간 후 캡슐이 굴러나오는 애니메이션 시작
+            setTimeout(() => {
+                resultCapsuleElement.style.display = "flex"; // 캡슐 보이게
+                resultCapsuleElement.classList.add("rolling-out"); // 굴러나오는 애니메이션
+                capsuleSound.play(); // 캡슐 떨어지는 소리
+            }, 300); // 레버 애니메이션 시간 (0.2초) + 약간의 텀
+
+            // 2. 캡슐이 굴러나온 후 (1.5초 후) 캡슐에 등수 표시
+            let prize; // prize 변수를 밖에서 선언
+            setTimeout(() => {
+                
+                // --- [NEW] 캡슐 흔들림 효과 중지 ---
+                if (gachaWindowElement) {
+                    gachaWindowElement.classList.remove("shaking");
+                }
+                
+                prize = drawPrize(); // [MODIFIED] getPrize() 대신 drawPrize() 사용
+                
+                resultCapsuleElement.textContent = prize.text;
+                resultCapsuleElement.style.backgroundColor = prize.color; // 캡슐 색상 변경
+                resultCapsuleElement.classList.add("prize-reveal-animation"); // 캡슐 펄스 애니메이션
+
+                messageElement.textContent = `축하합니다! ${prize.text} 당첨!`;
+            }, 300 + 1500); // 레버 + 캡슐 굴러나오는 시간 (1.8초)
+
+            // 3. 캡슐 등수 표시 후 (0.5초 후) 큰 화면으로 당첨 이펙트 표시
+            setTimeout(() => {
+                // prize 변수가 설정되었는지 확인
+                if (!prize) return;
+
+                // 텍스트 설정 및 등급별 클래스 추가
+                prizeTextElement.textContent = prize.text;
+                prizeTextElement.className = 'prize-text'; // 기본 클래스로 리셋
+                if (prize.text === "1등!") {
+                    prizeTextElement.classList.add('rank-1');
+                } else if (prize.text === "2등!") {
+                    prizeTextElement.classList.add('rank-2');
+                } else if (prize.text === "3등!") {
+                    prizeTextElement.classList.add('rank-3');
+                } else {
+                    prizeTextElement.classList.add('rank-other');
+                }
+                
+                prizeModalElement.style.display = 'flex'; // 모달 표시
+                setTimeout(() => prizeModalElement.classList.add('show'), 10); // 페이드인 애니메이션 시작
+                prizeRevealSound.play(); // 당첨 소리 재생
+
+            }, 300 + 1500 + 500); // 총 2.3초 후
+
+            // 4. 모든 과정이 끝난 후 (당첨 이펙트 2.5초간 표시 후) 초기화
+            setTimeout(() => {
+                // 모달 숨기기
+                prizeModalElement.classList.remove('show');
+
+                // 레버 원위치
+                leverArmElement.classList.remove("pulled"); 
+                // 동전 초기화
+                coinElement.classList.remove("inserted");
+                /* [수정] 아래 4줄의 코드가 CSS 애니메이션과 충돌을 일으켰습니다.
+                   이 줄들을 삭제하여 CSS가 자연스럽게 복귀 애니메이션을 처리하도록 합니다.
+                */
+                // coinElement.style.opacity = '1'; 
+                // coinElement.style.top = '50%'; 
+                // coinElement.style.left = 'calc(50% - 325px)'; 
+                // coinElement.style.transform = 'translateY(-50%)'; 
+                
+                resultCapsuleElement.classList.remove("rolling-out");
+                resultCapsuleElement.classList.remove("prize-reveal-animation");
+                resultCapsuleElement.style.display = "none"; // 캡슐 숨김
+                resultCapsuleElement.style.backgroundColor = "#f4d03f"; // 캡슐 색상 초기화
+                resultCapsuleElement.textContent = ""; // 캡슐 내용 초기화
+
+                isCoinInserted = false;
+                isGachaProcessing = false;
+                leverArmElement.classList.add("disabled"); // 레버 다시 비활성화
+
+                // [MODIFIED] 소진되었는지 확인 후 메시지 변경
+                if (prizeBag.length === 0) {
+                    messageElement.textContent = "상품이 모두 소진되었습니다!";
+                    messageElement.classList.add("error");
+                } else {
+                    messageElement.textContent = "다시 동전을 넣어주세요.";
+                }
+                
+                // 모달 페이드아웃(0.3초) 후 완전히 숨김
+                setTimeout(() => {
+                    prizeModalElement.style.display = 'none';
+                    prizeTextElement.className = 'prize-text'; // 클래스 초기화
+                }, 300);
+
+            }, 300 + 1500 + 500 + 2500); // 총 4.8초 후
+        });
+
+        // 초기 로드 시 레버 비활성화
+        leverArmElement.classList.add("disabled");
+
+        // 동전 사운드 미리 로드 (iOS 등에서 자동 재생 제한 회피)
+        document.addEventListener('DOMContentLoaded', () => {
+            coinSound.load();
+            leverSound.load();
+            capsuleSound.load();
+            prizeRevealSound.load();
+
+            // --- [NEW] ---
+            createPrizeBag(); // 페이지 로드 시 상품 주머니 생성 및 섞기
+            updatePrizeCounterUI(); // 초기 갯수 표시
+            // --- [NEW] 끝 ---
+        });
+
+    </script>
+
+</body>
+</html>
+
+
